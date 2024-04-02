@@ -1,0 +1,342 @@
+---
+title: "diff_N_amount"
+author: "Qianqian Du"
+date: "2023-11-25"
+output: html_document
+---
+# Objective:
++ Figure out how to extract $N_s$ and $N_p$ from APSIM using R, then see how vary they are.
+
++ run by different N amount, for different years.
+  + seq(100, 200, by = 20), isolate the impact of weather. 
+
+# uplode the packages
+```{r, message=FALSE, warning=FALSE}
+library(apsimx)
+library(tidyverse)
+library(ggplot2)
+library(data.table)
+library(oce)
+library(lubridate)
+``` 
+
+```{r}
+# path to the file
+extd.dir = "/Users/qianqiandu/Library/CloudStorage/Box-Box/N_Residual_APSIM/Git_Controled/Learning_APSIM_codes/12_Nitrogen_and_Carbon_Cycling"
+
+###===== edit parameters ===###
+# edit_apsimx("Nitrogen_balance.apsimx", src.dir = extd.dir,
+#                  wrt.dir = extd.dir, node = "Manager",
+#                  manager.child = "Fertilise on fixed dates",
+#                  parm = "Amount", value = 200, verbose = TRUE)
+
+inspect_apsimx("Nitrogen_balance.apsimx", src.dir = extd.dir, node = "Clock")
+
+edit_apsimx("Nitrogen_balance.apsimx", src.dir = extd.dir,
+              wrt.dir = extd.dir, node = "Clock",
+              parm = "Start", value = "01/01/1990", verbose = TRUE)
+
+edit_apsimx("Nitrogen_balance-edited.apsimx", src.dir = extd.dir,
+              wrt.dir = extd.dir, node = "Clock",
+              parm = "End", value = "12/31/2020", verbose = TRUE)
+
+
+## Make sure it worked
+inspect_apsimx("Nitrogen_balance-edited-edited.apsimx", src.dir = extd.dir, node = "Clock")
+
+inspect_apsimx("Nitrogen_balance-edited.apsimx", src.dir = extd.dir, 
+               node = "Manager", parm = list("Fertilise on fixed date", NA))
+
+
+#######============== Run simulations =============#######
+sim_150 <- apsimx("Nitrogen_balance-edited-edited.apsimx", src.dir = extd.dir, value = "Report") %>% 
+  data.table()
+
+#######============== process the results to analysis =============#######
+
+sim_150_data <- sim_150 %>% 
+  .[, .(Date, SimulationID, NO3, AnnualResidueMineral, AnnualSoilMineral, AnnualN2O, AnnualNfertilizer, SurfaceN, TotalMineralization, CropYield)] %>% 
+  .[, year := as.numeric(format(sim_150$Date, "%Y"))] %>%
+  .[, month := as.numeric(format(sim_150$Date, "%m"))] %>% 
+  .[, day := as.numeric(format(sim_150$Date, "%d"))]
+
+
+sim_150_data$year %>% unique()
+```
+
+# visualize the results
+
+```{r}
+figure_2010 <- ggplot()+
+  geom_point(aes(x = Date, y = CropYield, color = "CropYield"), 
+             data = sim_150_data[year == "2010" & SimulationID == 1, ]
+              )+
+  geom_point(aes(x = Date, y = SurfaceN*40, color = "SurfaceN"), 
+             data = sim_150_data[year == "2010" & SimulationID == 1, ]
+             )+
+  geom_point(aes(x = Date, y = NO3*4, color = "NO3"), 
+             data = sim_150_data[year == "2010" & SimulationID == 1, ]
+             )+
+    geom_point(aes(x = Date, y = AnnualResidueMineral*10, color = "AnnualResidueMineral"), 
+             data = sim_150_data[year == "2010" & SimulationID == 1, ]
+             )+
+  geom_vline(xintercept = as.numeric(as.Date("2010-05-05")))+
+  geom_vline(xintercept = as.numeric(as.Date("2011-05-05")))+
+  geom_vline(xintercept = as.numeric(as.Date("2012-05-05")))+
+  scale_y_continuous(
+    name = "yield",
+    sec.axis = sec_axis(~.*1/40, name="Surface N")
+  )+
+  theme_bw()
+
+figure_2010
+
+```
+
+```{r, cache=TRUE}
+
+fig_NO3_2010_13 <- ggplot()+
+  geom_point(aes(x = Date, y = NO3, color = factor(year)), 
+             data = sim_150_data[year %in% c(2010, 2011, 2012, 2013) & SimulationID == 1, ]
+             )+
+  geom_vline(xintercept = as.numeric(as.Date("2010-05-05")))+
+  geom_vline(xintercept = as.numeric(as.Date("2011-05-05")))+
+  geom_vline(xintercept = as.numeric(as.Date("2012-05-05")))+
+  geom_vline(xintercept = as.numeric(as.Date("2013-05-05")))+
+  theme_bw()
+
+fig_NO3_2010_13
+
+# Then, run simulation from 1980 to 2020
+fig_NO3 <- ggplot()+
+  geom_point(aes(x = Date, y = NO3, color = factor(year)), 
+             data = sim_150_data[SimulationID == 1, ]
+             )+
+
+  theme_bw()
+
+fig_NO3
+
+
+
+#--- download weather data in the field location from daymat ---#
+daymet_data <- download_daymet("Ames",
+                               lat = 42.0308, 
+                               lon = -93.6319, 
+                               start = 1990, 
+                               end = 2023,
+                               path = "/Users/qianqiandu/Desktop",
+                               internal = FALSE)
+
+read_csv <- read_csv(("/Users/qianqiandu/Desktop/Ames_1990_2023.csv"), skip = 7) %>% 
+  data.table() %>% 
+  setnames("prcp (mm/day)", "prcp") %>% 
+  setnames('tmax (deg c)', "tmax") %>% 
+  setnames('tmin (deg c)', "tmim") %>% 
+  .[, week := paste0("week_", sprintf("%02d", ceiling(yday / 7)))] %>% 
+  .[, .(year, yday, week, prcp, tmax, tmim)] %>% 
+  .[, mean_temp := (tmax + tmim)/2] %>% 
+  mutate(month = case_when(yday <= 31 ~ "Jan",
+                           yday > 31 & yday <= 59 ~ "Feb",
+                           yday > 59 & yday <= 90 ~ "Mar",
+                           yday > 90 & yday <= 120 ~ "Apr",
+                           yday > 120 & yday <= 151 ~ "May",
+                           yday > 151 & yday <= 181 ~ "Jun",
+                           yday > 181 & yday <= 211 ~ "Jul",
+                           yday > 211 & yday <= 242 ~ "Aug",
+                           yday > 242 & yday <= 273 ~ "Sep",
+                           yday > 273 & yday <= 303 ~ "Oct",
+                           yday > 303 & yday <= 334 ~ "Nov",
+                           yday > 334 & yday <= 366 ~ "Dec"))
+
+
+#------- get weekly average precipitation and temperature data -------#
+weather_weekly <- read_csv %>% 
+  group_by(year, week) %>% 
+  summarise(week_prcp = mean(prcp), week_temp = mean(mean_temp)) %>% 
+  data.table()
+
+
+#------- get yearly average precipitation -------#
+weather_result_year <- read_csv %>% 
+  data.table() %>% 
+  .[, .(month_precip = sum(prcp)), by = c("year")] %>% 
+  # .[, .(mean_precip = mean(month_precip)), by = "month"] %>% 
+  ##---- convert precip from mm to inch ----##
+  .[, year_precip_in := month_precip* 0.0393701]
+
+ggplot(data = weather_result_year)+
+  geom_line(aes(x = year, y = year_precip_in))
+
+
+#--- download weather data in the field location from daymat ---#
+daymet_data <- download_daymet("Ames",
+                               lat = 42.0308, 
+                               lon = -93.6319, 
+                               start = 1990, 
+                               end = 2023,
+                               path = "/Users/qianqiandu/Desktop",
+                               internal = FALSE)
+
+read_csv <- read_csv(("/Users/qianqiandu/Desktop/Ames_1990_2023.csv"), skip = 7) %>% 
+  data.table() %>% 
+  setnames("prcp (mm/day)", "prcp") %>% 
+  setnames('tmax (deg c)', "tmax") %>% 
+  setnames('tmin (deg c)', "tmim") %>% 
+  .[, week := paste0("week_", sprintf("%02d", ceiling(yday / 7)))] %>% 
+  .[, .(year, yday, week, prcp, tmax, tmim)] %>% 
+  .[, mean_temp := (tmax + tmim)/2] %>% 
+  mutate(month = case_when(yday <= 31 ~ "Jan",
+                           yday > 31 & yday <= 59 ~ "Feb",
+                           yday > 59 & yday <= 90 ~ "Mar",
+                           yday > 90 & yday <= 120 ~ "Apr",
+                           yday > 120 & yday <= 151 ~ "May",
+                           yday > 151 & yday <= 181 ~ "Jun",
+                           yday > 181 & yday <= 211 ~ "Jul",
+                           yday > 211 & yday <= 242 ~ "Aug",
+                           yday > 242 & yday <= 273 ~ "Sep",
+                           yday > 273 & yday <= 303 ~ "Oct",
+                           yday > 303 & yday <= 334 ~ "Nov",
+                           yday > 334 & yday <= 366 ~ "Dec"))
+
+
+
+#------- get yearly average precipitation -------#
+weather_result_year <- read_csv %>% 
+  data.table() %>% 
+  .[, .(month_precip = sum(prcp)), by = c("year")] %>% 
+  # .[, .(mean_precip = mean(month_precip)), by = "month"] %>% 
+  ##---- convert precip from mm to inch ----##
+  .[, year_precip_in := month_precip* 0.0393701]
+
+ggplot(data = weather_result_year)+
+  geom_line(aes(x = year, y = year_precip_in))
+
+
+ggplot()+
+  geom_point(aes(x = year, y = NO3, color = factor(year)),
+             data = sim_150_data[SimulationID == 1 & month == 5 & day == 4, ]
+             )+
+  geom_line(aes(x = year, y = year_precip_in*5), data = weather_result_year)+
+  theme_bw()+
+  ggtitle("black line is annual precipitation")
+  
+  
+
+
+
+
+
+
+
+###========= see the summary of N_s, which is the N amount on May 4th, May 5th is the N application day =====###
+
+N_s <- sim_150_data %>% 
+  .[month == 5 & day == 4, NO3]
+
+N_s
+
+summary(N_s)
+
+hist(N_s)
+
+```
+
+
+# Run one year with a squence of N, so we can see the impact of N fertilizer on N residuals, isolating the weather impact.
+
+```{r, cache=TRUE}
+###============ set up the simulation date from 2015 to 2019 ========###
+edit_apsimx("Nitrogen_balance.apsimx", src.dir = extd.dir,
+              wrt.dir = extd.dir, node = "Clock",
+              parm = "Start", value = "01/01/2015", verbose = TRUE)
+
+edit_apsimx("Nitrogen_balance-edited.apsimx", src.dir = extd.dir,
+              wrt.dir = extd.dir, node = "Clock",
+              parm = "End", value = "12/31/2019", verbose = TRUE)
+
+
+
+sim_N_data <- data.frame()
+
+for (i in seq(100, 260, by = 20)) {
+  
+###===== edit parameters ===###
+edit_apsimx("Nitrogen_balance-edited-edited.apsimx", src.dir = extd.dir,
+                 wrt.dir = extd.dir, node = "Manager",
+                 manager.child = "Fertilise on fixed dates",
+                 parm = "Amount", value = i, verbose = TRUE)
+
+
+#######============== Run simulations =============#######
+sim_N <- apsimx("Nitrogen_balance-edited-edited-edited.apsimx", src.dir = extd.dir, value = "Report") %>% 
+  data.table()
+
+sim_N_result <- sim_N %>% 
+  .[, .(Date, SimulationID, NO3, AnnualResidueMineral, AnnualSoilMineral, AnnualN2O, AnnualNfertilizer, SurfaceN, TotalMineralization, CropYield, AnnualNleaching)] %>% 
+  .[, year := as.numeric(format(sim_N$Date, "%Y"))] %>%
+  .[, month := as.numeric(format(sim_N$Date, "%m"))] %>% 
+  .[, day := as.numeric(format(sim_N$Date, "%d"))]
+
+
+sim_N_data = rbind(sim_N_data, sim_N_result)
+
+}
+
+sim_N_data$AnnualNfertilizer %>% unique()
+
+```
+
+```{r}
+
+sim_N_2015_fig <- ggplot(data = sim_N_data[year == 2015, ])+
+  geom_point(aes(x = Date, y = NO3, color = factor(AnnualNfertilizer)), size = 0.8)+
+  theme_bw()
+
+sim_N_2015_fig
+
+
+sim_N_2015_19_fig <- ggplot(data = sim_N_data)+
+  geom_point(aes(x = Date, y = NO3, color = factor(AnnualNfertilizer)), size = 0.8)+
+  theme_bw()+
+  ggtitle("when the N is zero (orange), it should be the N residual from 01-01 to 04-05")
+
+sim_N_2015_19_fig
+
+```
+```{r}
+#Look at N leaching
+
+sim_N_leaching_fig <- ggplot(data = sim_N_data)+
+  geom_point(aes(x = Date, y = AnnualNleaching, color = factor(AnnualNfertilizer)), size = 0.8)+
+  theme_bw()
+
+sim_N_leaching_fig
+```
+
+# Thoughts: 
+
++ Figure out how to extract $N_s$ and $N_p$ from APSIM using R, then see how vary they are.
+
+Based on very simple regressions, I think the results are consistent with what we expected- $N_s$ and $N_p$ have pretty large variations. The mean of $N_s$ is ` r N_s %>% mean()`, so estimating $N_s$ should play a significant role in estimating EONR.
+
+```{r}
+N_s
+```
+
+Look at the weather from these years, I am expecting to see some patterns between precipitation and N_s. 
+
+However, the simulations I ran above were pretty simple. I used default setting in APSIM, just changed the date and N amount. Next, need to keep exploring the variables, and think about the set up of the simulations more carefully. 
+
+---
+
+Later steps to do: 
+
++ Find a point's historical daily weather data, finding a function in R to generate its weather distribution.
++ Run APSIM on the hypothetical weather data for that point.
++ Solve the ex-ante and ex-post for maximization.
+
+
+
+
+

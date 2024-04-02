@@ -1,0 +1,663 @@
+---
+title: "Consistent N rate trials over years"
+author: "Qianqian Du"
+date: "2024-03-04"
+output: html_document
+---
+
+# Objectives:
++ run on-farm experiments over years using the same trial design each year, assume homogeneous environment.
+
+# uplode the packages
+```{r, message=FALSE, warning=FALSE}
+# update the apsimx package as the latest version
+# library(remotes)
+# remotes::install_github('femiguez/apsimx')
+
+library(apsimx)
+library(tidyverse)
+library(ggplot2)
+library(data.table)
+library(oce)
+library(lubridate)
+library(daymetr)
+
+``` 
+
+
+```{r}
+
+### ============ set path to the file ============ ###
+extd.dir = "/Users/qianqiandu/Desktop/N_Residual_APSIM/Git_Controled/consistent_rate_trials"
+
+write_dir = "/Users/qianqiandu/Desktop/N_Residual_APSIM/Git_Controled/consistent_rate_trials"
+
+
+###========== Check parameters of the file =========###
+inspect_apsimx("consisten_rate_trials.apsimx", src.dir = extd.dir, node = "Clock")
+
+
+edit_apsimx("consisten_rate_trials.apsimx", src.dir = extd.dir,
+              wrt.dir = write_dir, node = "Clock",
+              parm = "Start", value = "01/01/2015")
+
+edit_apsimx("consisten_rate_trials-edited.apsimx", src.dir = extd.dir,
+              wrt.dir = write_dir, node = "Clock",
+              parm = "End", value = "12/31/2021", overwrite = TRUE)
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx", src.dir = extd.dir, node = "Clock")
+
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx", src.dir = extd.dir, node = "Weather")
+
+edit_apsimx("consisten_rate_trials-edited.apsimx", src.dir = extd.dir,
+              wrt.dir = write_dir, node = "Weather",
+              value = "lowa_CC.met", overwrite = TRUE)
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx", src.dir = extd.dir, node = "Weather")
+
+
+```
+
+
+# See the result
+```{r}
+
+analysis_trials_data <- readRDS(paste0(write_dir, "/consistent_rate_trials.rds"))
+
+# Take a look at the NO3 levels from each N rate application
+
+NO3_by_N <- ggplot(data = analysis_trials_data)+
+  geom_line(aes(x = Date, y = NO3, color = applied_N))+
+  theme_bw()
+
+## The figure of NO3 by years 
+
+NO3_by_N
+
+
+# Find the max yield level in each year in each level of N application
+
+analysis_result <- analysis_trials_data %>% 
+  data.table() %>% 
+  .[, .(max_yield = max(CropYield)), by = c("year", "applied_N")]
+
+ggplot(data = analysis_result)+
+  geom_point(aes(x = applied_N, y = max_yield, color = as.factor(year)))+
+  geom_line(aes(x = applied_N, y = max_yield, color = as.factor(year)))
+
+```
+
+```{r}
+max_yield <- analysis_trials_data %>% 
+  .[, .(maxYield = max(CropYield)), by = c("year")]
+
+ggplot(data = max_yield)+
+  geom_point(aes(x = year, y = maxYield))
+
+
+#--- download weather data in the field location from daymat ---#
+daymet_data <- download_daymet("Ames",
+                               lat = 42.0308, 
+                               lon = -93.6319, 
+                               start = 2004, 
+                               end = 2004,
+                               path = "/Users/qianqiandu/Desktop",
+                               internal = FALSE)
+
+
+read_csv <- read_csv(("/Users/qianqiandu/Desktop/Ames_2004_2004.csv"), skip = 6) %>% 
+  data.table() %>% 
+  setnames("prcp (mm/day)", "prcp", skip_absent=TRUE) %>% 
+  setnames('tmax (deg c)', "tmax", skip_absent=TRUE) %>% 
+  setnames('tmin (deg c)', "tmim", skip_absent=TRUE) %>% 
+  # .[, week := paste0("week_", sprintf("%02d", ceiling(yday / 7)))] %>% 
+  .[, mean_temp := (tmax + tmim)/2] %>%
+  .[, date := yday - 1 + ymd(paste0(year, "-01-01"))] %>%
+  .[, month := month(date)]
+
+
+```
+
+#------- get weekly average precipitation and temperature data -------#
+weather_weekly <- read_csv %>% 
+  group_by(year, week) %>% 
+  summarise(week_prcp = mean(prcp), week_temp = mean(mean_temp)) %>% 
+  data.table()
+
+
+#------- get yearly average precipitation -------#
+weather_result_year <- read_csv %>% 
+  data.table() %>% 
+  .[year<=2020 & year >= 2005, .(month_precip = sum(prcp)), by = c("year")] %>% 
+  # .[, .(mean_precip = mean(month_precip)), by = "month"] %>% 
+  ##---- convert precip from mm to inch ----##
+  .[, year_precip_in := month_precip* 0.0393701]
+
+
+
+### The figure of max yield and precipitation ###
+ggplot()+
+  geom_line(aes(x = year, y = max_yield, color = as.factor(applied_N)), data = analysis_result)+
+  geom_line(aes(x = year, y = year_precip_in*10), data = weather_result_year)+
+  # Custom the Y scales:
+  scale_y_continuous(
+    
+    # Features of the first axis
+    name = "yield",
+    
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(trans=~.*0.1, name = "precip")
+  )+
+  theme_bw()
+  
+```
+
+
+
+# change the N rates in Operations through R
+
+```{r}
+simulation_result <- data.frame()
+simulation_real_weather <- data.frame()
+
+# length(N_rates[[1]])
+```
+
+```{r}
+
+###=============================================================###
+#####======== change the N rates in Operations through R =========#
+###=============================================================###
+
+#### Editing just one operation, need to change all three ####
+
+for (i in 1:length(N_rates[[1]])) {
+
+N_rates <- list(seq(0, 270, by = 30))
+
+N = as.character(N_rates[[1]][i])
+
+new.date <- "2015-05-05"
+# new.action <- '[Fertiliser].Apply(Amount: 0, Type: Fertiliser.Types.UAN_N, Depth: 30)'
+new.action <- paste0("[Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+
+# new.line <- '2015-05-05 [Fertiliser].Apply(Amount: 0, Type: Fertiliser.Types.UAN_N, Depth: 30)'
+new_line <- paste0("2015-05-05 [Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(3, 'Date'),
+            value = new.date,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(3, 'Action'),
+            value = new.action,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(3, 'Line'),
+            value = new.action,
+            overwrite = TRUE)
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(3, 'Date'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(3, 'Action'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(3, 'Line'))
+
+
+##--------------- change the 2nd year's fertilizer amount -------------##
+new.date <- "2016-05-05"
+new.action <- paste0("[Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+new_line <- paste0("2016-05-05 [Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(11, 'Date'),
+            value = new.date,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(11, 'Action'),
+            value = new.action,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(11, 'Line'),
+            value = new.action,
+            overwrite = TRUE)
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(11, 'Date'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(11, 'Action'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(11, 'Line'))
+
+
+
+##--------------- change the 3rd year's fertilizer amount -------------##
+new.date <- "2017-05-05"
+new.action <- paste0("[Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+new_line <- paste0("2017-05-05 [Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(19, 'Date'),
+            value = new.date,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(19, 'Action'),
+            value = new.action,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(19, 'Line'),
+            value = new.action,
+            overwrite = TRUE)
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(19, 'Date'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(19, 'Action'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(19, 'Line'))
+
+
+##--------------- change the 4th year's fertilizer amount -------------##
+new.date <- "2018-05-05"
+new.action <- paste0("[Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+new_line <- paste0("2018-05-05 [Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(27, 'Date'),
+            value = new.date,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(27, 'Action'),
+            value = new.action,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(27, 'Line'),
+            value = new.action,
+            overwrite = TRUE)
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(27, 'Date'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(27, 'Action'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(27, 'Line'))
+
+
+##--------------- change the 5th year's fertilizer amount -------------##
+new.date <- "2019-05-05"
+new.action <- paste0("[Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+new_line <- paste0("2019-05-05 [Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(35, 'Date'),
+            value = new.date,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(35, 'Action'),
+            value = new.action,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(35, 'Line'),
+            value = new.action,
+            overwrite = TRUE)
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(35, 'Date'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(35, 'Action'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(35, 'Line'))
+
+
+
+##--------------- change the 6th year's fertilizer amount -------------##
+new.date <- "2020-05-05"
+new.action <- paste0("[Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+new_line <- paste0("2020-05-05 [Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(43, 'Date'),
+            value = new.date,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(43, 'Action'),
+            value = new.action,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(43, 'Line'),
+            value = new.action,
+            overwrite = TRUE)
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(43, 'Date'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(43, 'Action'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(43, 'Line'))
+
+
+##--------------- change the 7th year's fertilizer amount -------------##
+new.date <- "2021-05-05"
+new.action <- paste0("[Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+new_line <- paste0("2021-05-05 [Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(51, 'Date'),
+            value = new.date,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(51, 'Action'),
+            value = new.action,
+            overwrite = TRUE)
+
+
+edit_apsimx("consisten_rate_trials-edited.apsimx",
+            src.dir = write_dir,
+            wrt.dir = write_dir,
+            node = "Operations",
+            parm = list(51, 'Line'),
+            value = new.action,
+            overwrite = TRUE)
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(51, 'Date'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(51, 'Action'))
+
+inspect_apsimx("consisten_rate_trials-edited.apsimx",
+               node = "Operations",
+               parm = list(51, 'Line'))
+
+
+
+##--------------- change the 8th year's fertilizer amount -------------##
+# new.date <- "2022-05-05"
+# new.action <- paste0("[Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+# new_line <- paste0("2022-05-05 [Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+# 
+# edit_apsimx("consisten_rate_trials-edited.apsimx",
+#             src.dir = write_dir,
+#             wrt.dir = write_dir,
+#             node = "Operations",
+#             parm = list(59, 'Date'),
+#             value = new.date,
+#             overwrite = TRUE)
+# 
+# 
+# edit_apsimx("consisten_rate_trials-edited.apsimx",
+#             src.dir = write_dir,
+#             wrt.dir = write_dir,
+#             node = "Operations",
+#             parm = list(59, 'Action'),
+#             value = new.action,
+#             overwrite = TRUE)
+# 
+# 
+# edit_apsimx("consisten_rate_trials-edited.apsimx",
+#             src.dir = write_dir,
+#             wrt.dir = write_dir,
+#             node = "Operations",
+#             parm = list(59, 'Line'),
+#             value = new.action,
+#             overwrite = TRUE)
+# 
+# inspect_apsimx("consisten_rate_trials-edited.apsimx",
+#                node = "Operations",
+#                parm = list(59, 'Date'))
+# 
+# inspect_apsimx("consisten_rate_trials-edited.apsimx",
+#                node = "Operations",
+#                parm = list(59, 'Action'))
+# 
+# inspect_apsimx("consisten_rate_trials-edited.apsimx",
+#                node = "Operations",
+#                parm = list(59, 'Line'))
+
+
+##--------------- change the 9th year's fertilizer amount -------------##
+# new.date <- "2023-05-05"
+# new.action <- paste0("[Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+# new_line <- paste0("2023-05-05 [Fertiliser].Apply(Amount: ",N,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+# 
+# edit_apsimx("consisten_rate_trials-edited.apsimx",
+#             src.dir = write_dir,
+#             wrt.dir = write_dir,
+#             node = "Operations",
+#             parm = list(67, 'Date'),
+#             value = new.date,
+#             overwrite = TRUE)
+# 
+# 
+# edit_apsimx("consisten_rate_trials-edited.apsimx",
+#             src.dir = write_dir,
+#             wrt.dir = write_dir,
+#             node = "Operations",
+#             parm = list(67, 'Action'),
+#             value = new.action,
+#             overwrite = TRUE)
+# 
+# 
+# edit_apsimx("consisten_rate_trials-edited.apsimx",
+#             src.dir = write_dir,
+#             wrt.dir = write_dir,
+#             node = "Operations",
+#             parm = list(67, 'Line'),
+#             value = new.action,
+#             overwrite = TRUE)
+# 
+# inspect_apsimx("consisten_rate_trials-edited.apsimx",
+#                node = "Operations",
+#                parm = list(67, 'Date'))
+# 
+# inspect_apsimx("consisten_rate_trials-edited.apsimx",
+#                node = "Operations",
+#                parm = list(67, 'Action'))
+# 
+# inspect_apsimx("consisten_rate_trials-edited.apsimx",
+#                node = "Operations",
+#                parm = list(67, 'Line'))
+
+
+#######============== Run simulations =============#######
+simulation <- apsimx("consisten_rate_trials-edited.apsimx", src.dir = write_dir, value = "Report") %>% 
+  data.table()
+  
+#######============== Clean simulation results =============#######
+  simulation_data <- simulation %>%  
+  .[, applied_N := as.character(N)] %>% 
+  setnames(c("Soil.Nutrient.MineralN(1)", "Soil.Nutrient.MineralN(2)", "Soil.Nutrient.MineralN(3)", "Soil.Nutrient.MineralN(4)", "Soil.Nutrient.MineralN(5)", "Soil.Nutrient.MineralN(6)", "Soil.Nutrient.MineralN(7)", "Soil.Nutrient.MineralN(8)"), c("Mineral_1", "Mineral_2", "Mineral_3","Mineral_4","Mineral_5","Mineral_6","Mineral_7", "Mineral_8")) %>% 
+  .[, .(Date, applied_N, NO3, NO3Leaching, AnnualNleaching, AnnualSoilMineral, AnnualNfertilizer, TotalMineralization, SoilMineralization, CropYield, Mineral_1, Mineral_2, Mineral_3, Mineral_4, Mineral_5, Mineral_6, Mineral_7, Mineral_8)] %>% 
+  .[, year := as.numeric(format(simulation$Date, "%Y"))] %>%
+  .[, month := as.numeric(format(simulation$Date, "%m"))] %>% 
+  .[, day := as.numeric(format(simulation$Date, "%d"))]
+
+
+###--- store the data ---###
+
+simulation_real_weather <- rbind(simulation_real_weather, simulation_data)
+
+}
+
+# saveRDS(simulation_result, "/Users/qianqiandu/Desktop/N_Residual_APSIM/Git_Controled/consistent_rate_trials/same_weather_cons_N.rds")
+
+```
+
+
+```{r}
+
+##-------------------- plot yield ~ applied_N --------------------##
+
+###------ Fake weather yield ------###
+yield <- simulation_result %>% 
+  data.table() %>% 
+  .[, .(yield = max(CropYield)), by = c("year", "applied_N")]
+
+yield$applied_N <- as.numeric(yield$applied_N)
+
+
+fig_fake_weather <- ggplot(data = yield)+
+  geom_point(aes(x = applied_N, y = yield, color = as.factor(year)))+
+  geom_line(aes(x = applied_N, y = yield, color = as.factor(year)))+
+  ggtitle("this used fake weather for consistent trials")
+
+
+###------ real weather yield ------###
+yield_real_weather <- simulation_real_weather %>% 
+  data.table() %>% 
+  .[, .(yield = max(CropYield)), by = c("year", "applied_N")]
+
+yield_real_weather$applied_N <- as.numeric(yield_real_weather$applied_N)
+
+
+fig_real_weather <- ggplot(data = yield_real_weather)+
+  geom_point(aes(x = applied_N, y = yield, color = as.factor(year)))+
+  geom_line(aes(x = applied_N, y = yield, color = as.factor(year)))+
+  ggtitle("this used real weather")+
+  theme_bw()
+
+ggsave(fig_fake_weather, file = "yield_fake_weather.pdf")
+
+```
+
+What doesn't make sense is that 2015 is completely flat, but I used exactly the same weather (2019), so it is not due to the weather. Maybe because of the initial year, I have some parameters missed for the initial point. 
+
+
+```{r}
+
+NO3 <- simulation_result %>% 
+  data.table() %>% 
+  .[, .(yield = max(CropYield), NO3), by = c("year", "applied_N")]
+
+ggplot(data = simulation_result)+
+  geom_point(aes(x = Date, y = NO3, color = factor(applied_N)))
+
+```
+
+
+
+
+
+
+

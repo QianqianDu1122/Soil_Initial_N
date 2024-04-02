@@ -1,0 +1,78 @@
+---
+title: "homogenous_field_trials_result"
+author: "Qianqian Du"
+date: "2024-03-24"
+output: html_document
+---
+
+# Objectives: 
+
++ Run on-farm experiments over years using the same trial design each year, assume homogeneous environment (field and weather).
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-03-23\ at\ 5.07.34 PM.png")
+```
+
+I also run it with real weather:
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-03-23\ at\ 4.59.12 PM.png")
+```
+
+
++ Run APSIM simulations through R, the trials follow OFPE setting- each plot/point received randomly different amount of N rates in each year. Assuming homogeneous plots within fields and fake weather with every year as 2019's weather. 100 plots in this field. 
+
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-03-23\ at\ 5.13.00 PM.png")
+```
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-03-23\ at\ 5.23.00 PM.png")
+```
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-03-23\ at\ 5.23.34 PM.png")
+```
+
+I also run ofpe with real weather:
+
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-03-23\ at\ 5.51.16 PM.png")
+```
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-03-23\ at\ 5.51.30 PM.png")
+```
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-03-23\ at\ 5.52.01 PM.png")
+```
+
+## We can see the results below in Rstudio if needed. 
+```{r}
+
+consis_trials <- readRDS("/Users/qianqiandu/Desktop/N_Residual_APSIM/Git_Controled/consistent_rate_trials/consistent_rate_trials.rds")
+
+```
+
+```{r}
+
+consis_trials <- readRDS("/Users/qianqiandu/Desktop/N_Residual_APSIM/Git_Controled/OFPE_trials/ofpe_fake_weather.rds")
+
+```
+
+
+# What's next: 
+
++ I will, first, do the simulations of yield data for Mona, after clarifying questions about .nc data.
+
++ Look at the results with NO3.
+
++ Maybe change the settings of a homogeneous field? 
+
+
+
+
+

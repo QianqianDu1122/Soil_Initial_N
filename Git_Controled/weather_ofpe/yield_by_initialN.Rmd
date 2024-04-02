@@ -1,0 +1,281 @@
+---
+title: "Initial N rates experiments"
+output: html_document
+---
+
+# uplode the packages
+```{r, message=FALSE, warning=FALSE}
+library(apsimx)
+library(tidyverse)
+library(ggplot2)
+library(data.table)
+library(oce)
+library(lubridate)
+``` 
+
+
+```{r}
+# path to the file
+extd.dir = "/Users/qianqiandu/Library/CloudStorage/Box-Box/N_Residual_APSIM/Git_Controled/Learning_APSIM_codes/12_Nitrogen_and_Carbon_Cycling"
+
+
+write_dir <- "/Users/qianqiandu/Library/CloudStorage/Box-Box/N_Residual_APSIM/Git_Controled"
+
+###===== edit parameters ===###
+# edit_apsimx("Nitrogen_balance.apsimx", src.dir = extd.dir,
+#                  wrt.dir = extd.dir, node = "Manager",
+#                  manager.child = "Fertilise on fixed dates",
+#                  parm = "Amount", value = 200, verbose = TRUE)
+
+inspect_apsimx("Nitrogen_balance.apsimx", src.dir = extd.dir, node = "Clock")
+
+edit_apsimx("Nitrogen_balance.apsimx", src.dir = extd.dir,
+              wrt.dir = write_dir, node = "Clock",
+              parm = "Start", value = "01/01/2010", verbose = TRUE)
+
+edit_apsimx("Nitrogen_balance-edited.apsimx", src.dir = extd.dir,
+              wrt.dir = write_dir, node = "Clock",
+              parm = "End", value = "12/31/2020", verbose = TRUE, overwrite = TRUE)
+
+
+## Make sure it worked
+inspect_apsimx("Nitrogen_balance-edited.apsimx", src.dir = write_dir, node = "Clock")
+
+inspect_apsimx("Nitrogen_balance-edited.apsimx", src.dir = extd.dir, 
+               node = "Manager", parm = list("Fertilise on fixed date", NA))
+
+
+#######============== Run simulations =============#######
+sim_150 <- apsimx("Nitrogen_balance-edited.apsimx", src.dir = write_dir, value = "Report") %>% 
+  data.table()
+
+#######============== process the results to analysis =============#######
+
+sim_150_data <- sim_150 %>% 
+  .[, .(Date, SimulationID, NO3, AnnualResidueMineral, AnnualSoilMineral, AnnualN2O, AnnualNfertilizer, SurfaceN, TotalMineralization, CropYield)] %>% 
+  .[, year := as.numeric(format(sim_150$Date, "%Y"))] %>%
+  .[, month := as.numeric(format(sim_150$Date, "%m"))] %>% 
+  .[, day := as.numeric(format(sim_150$Date, "%d"))]
+
+
+sim_150_data$year %>% unique()
+
+summary(sim_150)
+```
+
+
+# Write the function for running APSIM over years
+```{r}
+
+#### ========= path to the file ========####
+extd.dir = "/Users/qianqiandu/Library/CloudStorage/Box-Box/N_Residual_APSIM/Git_Controled/Learning_APSIM_codes/12_Nitrogen_and_Carbon_Cycling"
+
+write_dir <- "/Users/qianqiandu/Library/CloudStorage/Box-Box/N_Residual_APSIM/Git_Controled"
+
+#### ========= Set the clock for the years of running ofpe ========####
+inspect_apsimx("Nitrogen_balance.apsimx", src.dir = extd.dir, node = "Clock")
+
+edit_apsimx("Nitrogen_balance.apsimx", src.dir = extd.dir,
+              wrt.dir = write_dir, node = "Clock",
+              parm = "Start", value = "01/01/2010", verbose = TRUE)
+
+edit_apsimx("Nitrogen_balance-edited.apsimx", src.dir = extd.dir,
+              wrt.dir = write_dir, node = "Clock",
+              parm = "End", value = "12/31/2020", verbose = TRUE, overwrite = TRUE)
+
+## Make sure it worked
+inspect_apsimx("Nitrogen_balance-edited.apsimx", src.dir = write_dir, node = "Clock")
+
+
+
+all_data <- data.frame()
+
+run_N_apsim <- function(N) {
+  
+  ###===== edit N ===###
+edit_apsimx("Nitrogen_balance-edited.apsimx", src.dir = write_dir,
+                 wrt.dir = write_dir, node = "Manager",
+                 manager.child = "Fertilise on fixed dates",
+                 parm = "Amount", value = N, verbose = TRUE)
+   
+##===== check edit on N ===###
+inspect_apsimx("Nitrogen_balance-edited-edited.apsimx", src.dir = write_dir,
+               node = "Manager", parm = list("Fertilise on fixed date", NA))
+
+
+#######============== Run simulations =============#######
+sim_N <- apsimx("Nitrogen_balance-edited-edited.apsimx", src.dir = write_dir, value = "Report") %>%
+  data.table()
+
+#######============== process the results to analysis =============#######
+
+sim_data <- sim_N %>%
+  .[, .(Date, SimulationID, NO3, AnnualResidueMineral, AnnualSoilMineral, AnnualN2O, AnnualNfertilizer, SurfaceN, TotalMineralization, CropYield)] %>%
+  .[, year := as.numeric(format(sim_data$Date, "%Y"))] %>%
+  .[, month := as.numeric(format(sim_data$Date, "%m"))] %>%
+  .[, day := as.numeric(format(sim_data$Date, "%d"))]
+
+all_data <- rbind(all_data, sim_data)
+
+return(sim_N)
+  
+}
+
+run_N_apsim(240)
+
+sim_N$AnnualNfertilizer %>% unique()
+
+
+lapply(250, run_N_apsim)
+
+lapply(230, function(N) run_N_apsim(N = 230))
+
+sim_data$AnnualNfertilizer %>% unique()
+
+
+```
+
+
+# How NO3 level affects yield in the same weather year 
+
+```{r}
+
+inspect_apsimx("Nitrogen_balance_11.apsimx", src.dir = write_dir, node = "Clock")
+
+edit_apsimx("Nitrogen_balance_11.apsimx", src.dir = write_dir,
+              wrt.dir = write_dir, node = "Clock",
+              parm = "End", value = "01/01/2005", overwrite = TRUE)
+
+inspect_apsimx("Nitrogen_balance_11.apsimx", src.dir = write_dir, node = "Clock")
+
+#######============== Run simulations =============#######
+sim_100 <- apsimx("Nitrogen_balance_11.apsimx", src.dir = write_dir, value = "Report") %>% 
+  data.table()
+
+tail(sim_100)
+  
+sim_N_result <- sim_100 %>% 
+  .[, .(Date, SimulationID, NO3, AnnualResidueMineral, AnnualSoilMineral, AnnualN2O, AnnualNfertilizer, SurfaceN, TotalMineralization, CropYield, AnnualNleaching)] %>% 
+  .[, year := as.numeric(format(sim_100$Date, "%Y"))] %>%
+  .[, month := as.numeric(format(sim_100$Date, "%m"))] %>% 
+  .[, day := as.numeric(format(sim_100$Date, "%d"))]
+
+
+sim_N_result$year %>% unique()
+
+
+sim_N_result$AnnualNfertilizer %>% unique()
+
+
+ggplot(data = sim_N_result)+
+  geom_point(aes(x = Date, y = NO3, color = year))
+
+
+# inspect_apsimx("Nitrogen_balance.apsimx",
+#             src.dir = write_dir,
+#             node = "Soil",
+#             soil.child = "Chemical")
+# 
+# edit_apsimx("Nitrogen_balance.apsimx", 
+#             src.dir = write_dir,
+#             wrt.dir = ".",
+#             node = "Soil",
+#             soil.child = "Chemical",
+#             parm = "NO3",
+#             value = c(200, 0, 0, 0, 0, 0, 0, 0))
+
+```
+
+# (below is a loop version)
+```{r}
+sim_N_data_try <- data.frame()
+
+for (i in seq(50, 250, by = 20)) {
+  
+###===== edit parameters ===###
+edit_apsimx("Nitrogen_balance_11.apsimx", src.dir = write_dir,
+                 wrt.dir = write_dir, node = "Manager",
+                 manager.child = "Fertilise on fixed dates",
+                 parm = "Amount", value = i, verbose = TRUE)
+
+
+#######============== Run simulations =============#######
+sim_N <- apsimx("Nitrogen_balance_11-edited.apsimx", src.dir = write_dir, value = "Report") %>% 
+  data.table()
+
+sim_N_result <- sim_N %>% 
+  .[, .(Date, SimulationID, NO3, AnnualResidueMineral, AnnualSoilMineral, AnnualN2O, AnnualNfertilizer, SurfaceN, TotalMineralization, CropYield, AnnualNleaching)] %>% 
+  .[, year := as.numeric(format(sim_N$Date, "%Y"))] %>%
+  .[, month := as.numeric(format(sim_N$Date, "%m"))] %>% 
+  .[, day := as.numeric(format(sim_N$Date, "%d"))] %>% 
+  .[, applied_N := i] %>% 
+  .[, initial_NO3 := 110]
+
+sim_N_data_try = rbind(sim_N_data_try, sim_N_result)
+
+sim_N_data_try$AnnualNfertilizer %>% unique()
+
+}
+
+#--- check if the look worked and how many initial NO3 situations have been run ---#
+sim_N_data_try$initial_NO3 %>% unique()
+
+
+###---- Do not report the growing process, but the max yield in each year ----###
+analysis_data <- sim_N_data_try %>% 
+  group_by(applied_N, initial_NO3) %>% 
+  summarise(yield_max = max(CropYield))
+
+###----- visualize the result, yield response functions by different initial N rates -----###
+
+ggplot(data = analysis_data)+
+  geom_point(aes(x = applied_N, y = yield_max, color = factor(initial_NO3)))
+
+
+# ggplot()+
+#   geom_point(aes(x = Date, y = NO3), alpha = 0.7, data = sim_N_data_try[year == 2011 & initial_NO3 == 30])+ 
+#   geom_point(aes(x = Date, y = NO3), alpha = 0.1, data = sim_N_data_try[year == 2011 & initial_NO3 == 70], color = "red")
+
+
+```
+
+
+Below are a bunch of drafts to see how the result look like (discarded codes).
+```{r}
+names(sim_N_data)
+
+ggplot(data = sim_N_data[applied_N == 180, ])+
+  geom_point(aes(x = Date, y = CropYield, color = factor(year)))
+
+
+ggplot(data = sim_N_data)+
+  geom_point(aes(x = NO3, y = CropYield))+
+  facet_grid(applied_N~year)
+
+
+ggplot(data = sim_N_data[year==2015 & CropYield ==  ])+
+  geom_point(aes(x = , y = CropYield))+
+  facet_grid(applied_N~year)
+
+
+sim_N_data_2015_yield <- sim_N_data %>% 
+  .[year == 2015, ] %>% 
+  .[CropYield == max(CropYield), by = applied_N]
+
+sim_N_data_2015_yield_1 <- sim_N_data_2015_yield %>% 
+  group_by(applied_N) %>% 
+  filter(CropYield == max(CropYield))
+
+
+ggplot(data = sim_N_data_2015_yield_1)+
+  geom_point(aes(x = NO3, y = CropYield, color = applied_N))
+  # geom_point(aes(x = AnnualNfertilizer, y = CropYield), color = "red")
+
+
+ggplot(data = sim_N_data_2015_yield_1)+
+  geom_point(aes(x = NO3, y = sim_N_data_2015_yield_1$CropYield))+
+  geom_point(aes(x = AnnualNfertilizer, y = CropYield), color = "red")
+
+```
+
+

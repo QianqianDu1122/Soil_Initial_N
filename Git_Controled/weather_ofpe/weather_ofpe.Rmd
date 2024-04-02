@@ -1,0 +1,267 @@
+---
+title: "weather_ofpe"
+author: "Qianqian Du"
+date: "2023-12-14"
+output: html_document
+---
+# Objective:
++ plot the weather, check the correlation between rain and NO3
++ Run OFPE to see how N application rates changes the N residuals
+
+# uplode the packages
+```{r, message=FALSE, warning=FALSE}
+library(here)
+library(apsimx)
+library(tidyverse)
+library(ggplot2)
+library(data.table)
+library(oce)
+library(lubridate)
+library(readxl)
+``` 
+
+```{r}
+library(knitr)
+opts_chunk$set(error = TRUE)
+```
+
+```{r}
+#look at it with weather
+extd.dir = "/Users/qianqiandu/Library/CloudStorage/Box-Box/N_Residual_APSIM/Git_Controled/weather_ofpe"
+
+weather_IA <- read_apsim_met("Iowa_CC.met", src.dir = extd.dir) %>% 
+  data.table() %>% 
+  mutate(month = case_when(day <= 31 ~ "Jan",
+                           day > 31 & day <= 59 ~ "Feb",
+                           day > 59 & day <= 90 ~ "Mar",
+                           day > 90 & day <= 120 ~ "Apr",
+                           day > 120 & day <= 151 ~ "May",
+                           day > 151 & day <= 181 ~ "Jun",
+                           day > 181 & day <= 211 ~ "Jul",
+                           day > 211 & day <= 240 ~ "Aug",
+                           day > 240 & day <= 271 ~ "Sep",
+                           day > 271 & day <= 301 ~ "Oct",
+                           day > 301 & day <= 331 ~ "Nov",
+                           day > 331 & day <= 366 ~ "Dec",
+                           ))
+
+weather_IA$year <- as.character(weather_IA$year)
+weather_IA$month <- as.character(weather_IA$month)
+
+head(weather_IA)
+tail(weather_IA)
+
+  
+weather_IA_analysis <- weather_IA %>% 
+  .[year >= 1990 & year <= 2020, ] %>%   
+  .[, .(sum_year = sum(rain)), by = c("year")]
+
+
+ggplot(data = weather_IA_analysis)+
+  geom_point(aes(x = year, y = sum_year))+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+---
+
+#OFPE
+
+```{r}
+
+data <- read_excel("/Users/qianqiandu/Desktop/12_Nitrogen_and_Carbon_Cycling/Nitrogen_balance.xlsx") %>% data.table() %>% 
+  .[SimulationID == 4 |SimulationID == 5 | SimulationID == 6 |SimulationID == 7 | SimulationID == 8, ]
+
+data$SimulationName %>% unique()
+
+data$Clock.Today <- ymd(data$Clock.Today )
+
+data <- data %>% 
+  .[, year := year(Clock.Today)] %>% 
+  .[, month := month(Clock.Today)] %>% 
+  .[, day := day(Clock.Today)]
+  
+
+ggplot(data = data)+
+  geom_point(aes(x = Clock.Today, y = NO3, color = factor(year)), size = 0.5)+
+  theme_bw()
+
+```
+The N residuals are not carried over to the next year, this is a problem if running simulations in this way. 
+
+So I need to figure out a way to run APSIM year by year.
+
+# Try to change the NO3 value in the soil at the initial state for each year
+
+```{r}
+
+data[month == 12 & day ==31, .(year, month, day, SimulationID, NO3)]
+
+data <- read_excel("/Users/qianqiandu/Desktop/try/Nitrogen_balance.xlsx") %>% 
+  data.table()
+
+data$SimulationName %>% unique()
+
+data$Clock.Today <- ymd(data$Clock.Today )
+
+data <- data %>% 
+  .[, year := year(Clock.Today)] %>% 
+  .[, month := month(Clock.Today)] %>% 
+  .[, day := day(Clock.Today)]
+  
+
+ggplot(data = data[year == 2010, ])+
+  geom_point(aes(x = Clock.Today, y = NO3, color = factor(year)), size = 0.5)+
+  theme_bw()
+
+```
+
+---
+
+# Run for one plot from 2010 to 2015 
+
+Steps for one iteration:
+
++ run 2010 simulation. 
+  + extract the NO3 on Dec 31st 2010.
+  
++ run 2011 simulation
+  + change the time from 1/1/2021 to 12/31/2021
+  + change the N rate as a random number in c(150, 180, 200, 220, 240)
+  + change the initial NO3 on 1/1/2021 as the NO3 level on 12/31/2021.
+  
++ 2012 do the same thing and continue. 
+  
+```{r}
+
+results <- data.table()
+
+inspect_apsimx("Nitrogen_residual.apsimx", src.dir = extd.dir,
+               node = "Manager", parm = list("Fertilise on fixed date", NA))
+
+#######============== Run simulations =============#######
+sim_2010 <- apsimx("Nitrogen_residual.apsimx", src.dir = extd.dir, value = "Report") %>% 
+  data.table()
+
+sim_analysis <- sim_2010 %>% 
+  .[, year := year(Date)] %>% 
+  .[, month := month(Date)] %>% 
+  .[, day := day(Date)]
+
+
+results <- rbind(results, sim_analysis)
+
+#######============== Run simulations for the second year =============#######
+
+# Edit the time for the second year simulation 
+edit_apsimx("Nitrogen_residual.apsimx", src.dir = extd.dir,
+              wrt.dir = extd.dir, node = "Clock",
+              parm = c("Start", "End"), value = c("01/01/2011", "12/31/2011") , 
+              verbose = TRUE)
+
+inspect_apsimx("Nitrogen_residual-edited.apsimx", src.dir = extd.dir, node = "Clock")
+
+##--- Or store it in an object for later editing ---##
+# pp <- inspect_apsimx("Nitrogen_residual-edited.apsimx", src.dir = extd.dir,
+#               node = "Manager", parm = c("Fertilise on fixed dates", 3),
+#               print.path = TRUE)
+
+# edit_apsimx("Nitrogen_residual-edited.apsimx", 
+#            src.dir = extd.dir, wrt.dir = extd.dir,
+#            node = "Other", parm.path = pp, value = 200, 
+#            edit.tag = "-pp"
+#            )
+
+#--- Edit the fertilizer amount for the second year simulation ---#
+
+# Create a vector of 5 numbers for N rates
+numbers <- c(150, 180, 200, 220, 240)
+
+# Randomly select one N rate
+random_number <- sample(numbers, 1)
+
+print(random_number)
+
+
+edit_apsimx("Nitrogen_residual-edited.apsimx", 
+           src.dir = extd.dir, wrt.dir = extd.dir,
+           node = "Manager", manager.child = "Fertilise on fixed date", 
+           parm = "Amount", value = random_number
+           )
+
+inspect_apsimx("Nitrogen_residual-edited-edited.apsimx", src.dir = extd.dir,
+               node = "Manager", parm = list("Fertilise on fixed date", NA))
+
+
+#--- adjust the N residual amount based on last year's NO3 value on Dec 31st as the initial point ---#
+
+inspect_apsimx("Nitrogen_residual-edited-edited.apsimx", 
+            src.dir = extd.dir,
+            node = "Soil",
+            soil.child = "Chemical")
+# Where did NO3 go?????
+
+# edit_apsim("Nitrogen_residual-edited-edited.apsimx", 
+#             src.dir = extd.dir,
+#             wrt.dir = ".",
+#             node = "Soil",
+#             parm = "NO3",
+#             value = 200)
+
+
+# Try another file, which is offered in the APSIM example
+extd.dir3 = "/Users/qianqiandu/Desktop/14_Optimum_N_rate"
+
+inspect_apsimx("optimum_N_rate.apsimx", src.dir = extd.dir3,
+            node = "Soil",
+            soil.child = "Chemical")
+# NO3 is there, but can't use the normal way to change the NO3 values. 
+
+edit_apsimx("optimum_N_rate.apsimx", 
+            src.dir = extd.dir3,
+            wrt.dir = ".",
+            node = "Soil",
+            soil.child = "Chemical",
+            parm = "NO3",
+            value = c(200, 0, 0, 0, 0, 0, 0, 0))
+
+
+#######============== visualize the results =============#######
+
+# ggplot(data = sim_2010_analysis)+
+#   geom_point(aes(x = Date, y = NO3))
+#   
+```
+
+But, `edit_apsimx_replace_soil_profile` will lead to a different story. 
+
+# What's next:
+
++ NO3 at the initial point is a parameter, instead of a variable. So changing it is a bit more complex than I expected. Figure out how to change the initial NO3 on 1/1/2021 using the NO3 level on 12/31/2021. (But I am not sure if this is the best way of doing this).
+
++ Double check the purpose of running this simulation. 
+  + Run OFPE to see how N application rates changes the N residuals, and how it affect yield? 
+  
++ If I can figure the initial NO3 out and get the result. How should I visualize it? 
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

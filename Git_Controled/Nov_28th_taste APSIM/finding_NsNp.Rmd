@@ -1,0 +1,73 @@
+---
+title: "find_Ns_Np"
+author: "Qianqian Du"
+output: html_document
+---
+
+# uplode the packages
+```{r}
+library(apsimx)
+library(tidyverse)
+library(ggplot2)
+library(data.table)
+```
+
+# run a simulation through R
+
+```{r}
+# load a apsim file
+
+extd.dir = "/Users/qianqiandu/Desktop/12_Nitrogen_and_Carbon_Cycling"
+
+inspect_apsimx("Nitrogen_balance.apsimx", src.dir = extd.dir, node = "Soil")
+
+sim <- apsimx("Nitrogen_balance.apsimx", src.dir = extd.dir, value = "Report") 
+
+class(sim$Date)
+
+result <- sim %>% 
+  mutate(year = as.numeric(format(sim$Date, "%Y"))) %>% 
+  mutate(month = as.numeric(format(sim$Date, "%m"))) %>% 
+  mutate(day = as.numeric(format(sim$Date, "%d")))
+
+names(sim)
+  
+  
+# See surface N
+ggplot(data = result)+
+  geom_point(aes(x = Clock.Today, y = SurfaceN))
+
+
+result_analysis <- result %>% 
+  data.table() %>% 
+  .[, .(year_surface_N = mean(SurfaceN)), by = c("year", "month")] %>% 
+  .[, year_month := paste0(year, month)]
+
+
+ggplot(data = result_analysis)+
+  geom_point(aes(x = year_month, y = year_surface_N))
+
+
+# See yield and Surface N
+scale = 40
+
+ggplot(data = result)+
+  geom_point(aes(x = Clock.Today, y = CropYield))+
+  geom_point(aes(x = Clock.Today, y = SurfaceN*scale), color = "red")+
+  scale_y_continuous(
+    name = "yield",
+    sec.axis = sec_axis(~.*1/scale, name="Surface N")
+  )
+```
+
+
+I also run by a different soil type, the surface_N is very different.
+run by different N amount, for different years.
+seq(100, 200, by = 20), isolate the impact of weather. 
+
+Next:
+
++ Figure out N_s and N_p, which two variables actually represent the N_s and N_p, then see how vary they are.
++ Find a point's historical daily weather data, finding a function in R to generate its weather distribution.
++ Run APSIM on the hypothetical weather data for that point.
++ Solve the ex-ante and ex-post for maximization.
