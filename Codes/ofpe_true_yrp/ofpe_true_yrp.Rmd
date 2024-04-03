@@ -316,8 +316,17 @@ final_result <- rbind(final_result, simulation_data)
 
 ofpe_2018 <- readRDS("/Users/qianqiandu/Desktop/N_Residual_APSIM/Codes/ofpe_true_yrp/ofpe_2015_2018.rds") %>% 
   data.table() %>% 
-  .[year == 2018, ] %>% 
-  .[, .(yield = max(CropYield)), by = "applied_N"]
+  .[year == 2018, ] %>%
+  .[, c("applied_N", "plot_id")]
+
+combine$plot_id <- as.character(combine$plot_id)
+
+ofpe_2018 <- left_join(ofpe, combine, by = c("applied_N", "plot_id"))
+
+
+ggplot()+
+  geom_point(aes(x = applied_N, y = yield), data = ofpe_2018)+
+  geom_smooth(aes(x = applied_N, y = yield), data = ofpe_2018)
 
 ```
 
@@ -341,8 +350,8 @@ ofpe_2018$applied_N <- as.numeric(ofpe_2018$applied_N)
 ggplot()+
   geom_point(aes(x = applied_N, y = yield), data = combine, size = 0.3)+
   geom_line(aes(x = applied_N, y = yield, group = plot_id), data = combine, size = 0.3)+
-  geom_point(aes(x = applied_N, y = yield), data = ofpe_2018, color = "red")+
-  geom_line(aes(x = applied_N, y = yield), data = ofpe_2018, color = "red")+
+  geom_point(aes(x = applied_N, y = yield), data = ofpe_2018, color = "blue")+
+  geom_smooth(aes(x = applied_N, y = yield), data = ofpe_2018, size = 1.2)+
   theme_bw()
 
 
@@ -409,15 +418,16 @@ ggplot()+
 
 ```{r}
 ### ======= The second 20 locations =====###
-simulation_data_2 <- readRDS("/Users/qianqiandu/Desktop/N_Residual_APSIM/Git_Controled/ofpe_true_yrp/final_result_2.rds") %>% 
+simulation_data_7 <- readRDS("/Users/qianqiandu/Desktop/N_Residual_APSIM/Codes/ofpe_true_yrp/final_result_7.rds") %>% 
   data.table() %>% 
   .[year == 2018, ] %>%
-  mutate(plot_id = (row_number() - 1) %/% 3650 + 1) %>% 
+  mutate(plot_id = (row_number() - 1) %/% 3650 + 121) %>% 
   .[, .(yield = max(CropYield), NO3, Date), by = c("plot_id", "applied_N")] %>% 
   .[Date == '2018-05-04', ] %>% 
   mutate(NO3_group = case_when(NO3 < 25 ~ "Low",
                                NO3 >= 25 & NO3 < 30 ~ "Med", 
                                NO3 >= 30 ~ "High"))
+
 
 
 ggplot()+
