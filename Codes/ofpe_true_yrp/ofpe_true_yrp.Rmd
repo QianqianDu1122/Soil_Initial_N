@@ -14,8 +14,9 @@ output: html_document
 # Objectives:
 
 + Get the true true yield response functions for each plot, using ofpe for the previous years. 
++ Also, look the yield response in after running 2, 3, and 4 years  of OFPE.
 + When plotting the figure, one way to do it is by different location; another way to do it is to define the categories of the initial NO3. 
-+ Estimate the economic loss from running ofpe without controlling NO3. 
+
 
 
 # uplode the packages
@@ -31,7 +32,7 @@ library(ggplot2)
 library(data.table)
 library(oce)
 library(lubridate)
-
+library(gam)
 ``` 
 
 # Setup APSIM path and template 
@@ -53,7 +54,7 @@ edit_apsimx("ofpe_true_yrp.apsimx", src.dir = extd.dir,
 
 edit_apsimx("ofpe_true_yrp-edited.apsimx", src.dir = extd.dir,
               wrt.dir = write_dir, node = "Clock",
-              parm = "End", value = "12/31/2018", overwrite = TRUE)
+              parm = "End", value = "12/31/2016", overwrite = TRUE)
 
 inspect_apsimx("ofpe_true_yrp-edited.apsimx", src.dir = extd.dir, node = "Clock")
 
@@ -75,11 +76,12 @@ final_result <- data.frame()
 
 ###---- create N seq for trial designs ----###
 N_rates <- data.frame(
-    var_N = as.character(seq(0, 270, by = 30))
+    var_N = as.character(seq(0, 250, by = 5))
   )
 
-number_plot <- 200
+number_plot <- 20
 
+set.seed(230829)
 ###--- trial design ---###
 applied_N <- data.frame(
   year_1 = sample(N_rates$var_N, number_plot, replace = TRUE),
@@ -97,7 +99,7 @@ applied_N <- data.frame(
 # each loop iteration is one plot, 200 plots, so j = 1:200
 
 # for (j in 1:length(applied_N_by_plots[[1]])) {
-for (j in 1:200) {  
+for (j in 1:20) {  
   
 new.date <- "2015-05-05"
 # new.action <- '[Fertiliser].Apply(Amount: 0, Type: Fertiliser.Types.UAN_N, Depth: 30)'
@@ -145,11 +147,11 @@ inspect_apsimx("ofpe_true_yrp-edited.apsimx",
                node = "Operations",
                parm = list(3, 'Line'))
 
-
+  for (i in 1:nrow(N_rates)) {
 ##--------------- change the 2nd year's fertilizer amount -------------##
 new.date <- "2016-05-05"
-new.action <- paste0("[Fertiliser].Apply(Amount: ",applied_N[[2]][j],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
-new_line <- paste0("2016-05-05 [Fertiliser].Apply(Amount: ",applied_N[[2]][j],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+new.action <- paste0("[Fertiliser].Apply(Amount: ",N_rates[[1]][i],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+new_line <- paste0("2016-05-05 [Fertiliser].Apply(Amount: ",N_rates[[1]][i],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
 
 edit_apsimx("ofpe_true_yrp-edited.apsimx",
             src.dir = write_dir,
@@ -190,48 +192,49 @@ inspect_apsimx("ofpe_true_yrp-edited.apsimx",
                parm = list(11, 'Line'))
 
 
+  # for (i in 1:nrow(N_rates)) {
 ##--------------- change the 3rd year's fertilizer amount -------------##
-new.date <- "2017-05-05"
-new.action <- paste0("[Fertiliser].Apply(Amount: ",applied_N[[3]][j],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
-new_line <- paste0("2017-05-05 [Fertiliser].Apply(Amount: ",applied_N[[3]][j],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
-
-edit_apsimx("ofpe_true_yrp-edited.apsimx",
-            src.dir = write_dir,
-            wrt.dir = write_dir,
-            node = "Operations",
-            parm = list(19, 'Date'),
-            value = new.date,
-            overwrite = TRUE)
-
-
-edit_apsimx("ofpe_true_yrp-edited.apsimx",
-            src.dir = write_dir,
-            wrt.dir = write_dir,
-            node = "Operations",
-            parm = list(19, 'Action'),
-            value = new.action,
-            overwrite = TRUE)
-
-
-edit_apsimx("ofpe_true_yrp-edited.apsimx",
-            src.dir = write_dir,
-            wrt.dir = write_dir,
-            node = "Operations",
-            parm = list(19, 'Line'),
-            value = new.action,
-            overwrite = TRUE)
-
-inspect_apsimx("ofpe_true_yrp-edited.apsimx",
-               node = "Operations",
-               parm = list(19, 'Date'))
-
-inspect_apsimx("ofpe_true_yrp-edited.apsimx",
-               node = "Operations",
-               parm = list(19, 'Action'))
-
-inspect_apsimx("ofpe_true_yrp-edited.apsimx",
-               node = "Operations",
-               parm = list(19, 'Line'))
+# new.date <- "2017-05-05"
+# new.action <- paste0("[Fertiliser].Apply(Amount: ",N_rates[[1]][i],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+# new_line <- paste0("2017-05-05 [Fertiliser].Apply(Amount: ",N_rates[[1]][i],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+# 
+# edit_apsimx("ofpe_true_yrp-edited.apsimx",
+#             src.dir = write_dir,
+#             wrt.dir = write_dir,
+#             node = "Operations",
+#             parm = list(19, 'Date'),
+#             value = new.date,
+#             overwrite = TRUE)
+# 
+# 
+# edit_apsimx("ofpe_true_yrp-edited.apsimx",
+#             src.dir = write_dir,
+#             wrt.dir = write_dir,
+#             node = "Operations",
+#             parm = list(19, 'Action'),
+#             value = new.action,
+#             overwrite = TRUE)
+# 
+# 
+# edit_apsimx("ofpe_true_yrp-edited.apsimx",
+#             src.dir = write_dir,
+#             wrt.dir = write_dir,
+#             node = "Operations",
+#             parm = list(19, 'Line'),
+#             value = new.action,
+#             overwrite = TRUE)
+# 
+# inspect_apsimx("ofpe_true_yrp-edited.apsimx",
+#                node = "Operations",
+#                parm = list(19, 'Date'))
+# 
+# inspect_apsimx("ofpe_true_yrp-edited.apsimx",
+#                node = "Operations",
+#                parm = list(19, 'Action'))
+# 
+# inspect_apsimx("ofpe_true_yrp-edited.apsimx",
+#                node = "Operations",
+#                parm = list(19, 'Line'))
 
 
   # inner loop is to get the true yield response function for each plot, i is the N rate applied for that plot.
@@ -240,48 +243,48 @@ inspect_apsimx("ofpe_true_yrp-edited.apsimx",
     
     ##--------------- change the 4th year's fertilizer amount -------------##
 
-new.date <- "2018-05-05"
-new.action <- paste0("[Fertiliser].Apply(Amount: ",applied_N[[4]][j],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
-new_line <- paste0("2018-05-05 [Fertiliser].Apply(Amount: ",applied_N[[4]][j],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
-
-
-edit_apsimx("ofpe_true_yrp-edited.apsimx",
-            src.dir = write_dir,
-            wrt.dir = write_dir,
-            node = "Operations",
-            parm = list(27, 'Date'),
-            value = new.date,
-            overwrite = TRUE)
-
-
-edit_apsimx("ofpe_true_yrp-edited.apsimx",
-            src.dir = write_dir,
-            wrt.dir = write_dir,
-            node = "Operations",
-            parm = list(27, 'Action'),
-            value = new.action,
-            overwrite = TRUE)
-
-
-edit_apsimx("ofpe_true_yrp-edited.apsimx",
-            src.dir = write_dir,
-            wrt.dir = write_dir,
-            node = "Operations",
-            parm = list(27, 'Line'),
-            value = new.action,
-            overwrite = TRUE)
-
-inspect_apsimx("ofpe_true_yrp-edited.apsimx",
-               node = "Operations",
-               parm = list(27, 'Date'))
-
-inspect_apsimx("ofpe_true_yrp-edited.apsimx",
-               node = "Operations",
-               parm = list(27, 'Action'))
-
-inspect_apsimx("ofpe_true_yrp-edited.apsimx",
-               node = "Operations",
-               parm = list(27, 'Line'))
+# new.date <- "2018-05-05"
+# new.action <- paste0("[Fertiliser].Apply(Amount: ",applied_N[[4]][j],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+# new_line <- paste0("2018-05-05 [Fertiliser].Apply(Amount: ",applied_N[[4]][j],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+# 
+# 
+# edit_apsimx("ofpe_true_yrp-edited.apsimx",
+#             src.dir = write_dir,
+#             wrt.dir = write_dir,
+#             node = "Operations",
+#             parm = list(27, 'Date'),
+#             value = new.date,
+#             overwrite = TRUE)
+# 
+# 
+# edit_apsimx("ofpe_true_yrp-edited.apsimx",
+#             src.dir = write_dir,
+#             wrt.dir = write_dir,
+#             node = "Operations",
+#             parm = list(27, 'Action'),
+#             value = new.action,
+#             overwrite = TRUE)
+# 
+# 
+# edit_apsimx("ofpe_true_yrp-edited.apsimx",
+#             src.dir = write_dir,
+#             wrt.dir = write_dir,
+#             node = "Operations",
+#             parm = list(27, 'Line'),
+#             value = new.action,
+#             overwrite = TRUE)
+# 
+# inspect_apsimx("ofpe_true_yrp-edited.apsimx",
+#                node = "Operations",
+#                parm = list(27, 'Date'))
+# 
+# inspect_apsimx("ofpe_true_yrp-edited.apsimx",
+#                node = "Operations",
+#                parm = list(27, 'Action'))
+# 
+# inspect_apsimx("ofpe_true_yrp-edited.apsimx",
+#                node = "Operations",
+#                parm = list(27, 'Line'))
 
 
 #######============== Run simulations =============#######
@@ -303,17 +306,22 @@ simulation <- apsimx("ofpe_true_yrp-edited.apsimx", src.dir = write_dir, value =
 
 final_result <- rbind(final_result, simulation_data)
 
-  # }
+  }
 
 }
+
+final_result$applied_N %>% unique()
+final_result$plot_id %>% unique()
+# saveRDS(final_result, "/Users/qianqiandu/Desktop/N_Residual_APSIM/Codes/ofpe_true_yrp/ofpe_2015_2016_wet.rds")
+# saveRDS(final_result, "/Users/qianqiandu/Desktop/N_Residual_APSIM/Codes/ofpe_true_yrp/ofpe_2015_2018.rds")
 
 ```
 
 
 # This is the result of running ofpe in 2018 to get the estimated yield response
 ```{r}
-# saveRDS(final_result, "/Users/qianqiandu/Desktop/N_Residual_APSIM/Codes/ofpe_true_yrp/ofpe_2015_2018.rds")
 
+## --- 2018 --- ##
 ofpe_2018 <- readRDS("/Users/qianqiandu/Desktop/N_Residual_APSIM/Codes/ofpe_true_yrp/ofpe_2015_2018.rds") %>% 
   data.table() %>% 
   .[year == 2018, ] %>%
@@ -323,10 +331,39 @@ combine$plot_id <- as.character(combine$plot_id)
 
 ofpe_2018 <- left_join(ofpe, combine, by = c("applied_N", "plot_id"))
 
-
 ggplot()+
   geom_point(aes(x = applied_N, y = yield), data = ofpe_2018)+
   geom_smooth(aes(x = applied_N, y = yield), data = ofpe_2018)
+
+
+
+## --- 2017 --- ##
+
+ofpe_2017 <- data.frame(
+  applied_N = applied_N[[3]], 
+  plot_id = applied_N[[5]]
+)
+
+
+ofpe_2017$plot_id <- as.character(ofpe_2017$plot_id)
+ofpe_2017$applied_N <- as.numeric(ofpe_2017$applied_N)
+
+ofpe_2017 <- left_join(ofpe_2017, final_result_2017, by = c("applied_N", "plot_id"))
+
+
+
+## --- 2016 --- ##
+
+ofpe_2016 <- data.frame(
+  applied_N = applied_N[[2]], 
+  plot_id = applied_N[[5]]
+)
+
+
+ofpe_2016$plot_id <- as.character(ofpe_2016$plot_id)
+ofpe_2016$applied_N <- as.numeric(ofpe_2016$applied_N)
+
+ofpe_2016 <- left_join(ofpe_2016, final_result_2016, by = c("applied_N", "plot_id"))
 
 ```
 
@@ -348,10 +385,11 @@ ofpe_2018$applied_N <- as.numeric(ofpe_2018$applied_N)
 
 
 ggplot()+
-  geom_point(aes(x = applied_N, y = yield), data = combine, size = 0.3)+
-  geom_line(aes(x = applied_N, y = yield, group = plot_id), data = combine, size = 0.3)+
-  geom_point(aes(x = applied_N, y = yield), data = ofpe_2018, color = "blue")+
-  geom_smooth(aes(x = applied_N, y = yield), data = ofpe_2018, size = 1.2)+
+  geom_point(aes(x = applied_N, y = yield), data = final_result_2016, size = 0.3)+
+  geom_line(aes(x = applied_N, y = yield, group = plot_id), data = final_result_2016, size = 0.3)+
+  geom_point(aes(x = applied_N, y = yield), data = ofpe_2016, color = "blue")+
+  geom_smooth(aes(x = applied_N, y = yield), data = ofpe_2016, size = 1.2)+
+  ggtitle("2016, the 2rd year, wet year")+
   theme_bw()
 
 
@@ -377,6 +415,9 @@ ggplot()+
 
 
 ```
+
+
+# The 200 plots results are showing above, below is just for seeing each 20 plots, in case we have to look at them closer, but not useful (just ignore the codes below).
 
 ```{r}
 
