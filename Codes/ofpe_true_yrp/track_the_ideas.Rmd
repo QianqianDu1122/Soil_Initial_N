@@ -1,0 +1,102 @@
+---
+title: "Soil Initial N Affects Yield Response"
+author: "Qianqian Du"
+date: "2024-04-05"
+output: html_document
+---
+
+# Initial point 
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-04-09\ at\ 9.48.44 AM.png")
+```
+
++ To gain a better understanding of how N residuals will affect precision agricultural management. 
+  + How 2022 year’s N application will affect 2023 spring residuals, and subsequently, affect the 2023 N application and yield.
+
+
+We used homogeneous field, with fake weather (used 2019 as normal year's weather) for every year. In this way, we can isolate the weather effects on changing yield response, the only thing that changes yield response is initial soil N (N residual). And here is what I find out: 
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-04-09\ at\ 9.57.53 AM.png")
+```
+
+We see that the estimated yield responses are similar, which actually didn't follow our expectations. We realized that in the figure from the slides, we are assuming all the points having the same initial N residuals, which is not the case here, nor in the real world. So the previous research idea is sort of not meaningful if ofpe were running in previous years. 
+
+
+I also got the true true yield response function (colored), from consistent trial designs. The blue curve is the estimated yield response from ofpe. It is different than any of the true yield responses, which could because the underling initial N are different. In other words, the data that formed the estimated yield response are from different data generating process (they are from different yield responses). This could be a fundamental problem (?).
+
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-04-09\ at\ 10.39.02 AM.png")
+```
+
+
+# What else I explored in OFPE settings
+
++ I ran simulations of 200 plots in a homogeneous field with the same weather each year.
+  + OFPE settings in previous years.
+  + True yield were simulated and shown as the black curves (200 plots)
+  + Estimated ofpe yield response is shown as the blue curve. 
+  
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/be7aaa9b-abca-4c29-95eb-a3c66fe5258f.jpg")
+```
+
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/0744993d-c0fa-437c-83ba-3f42576ed31f-2.jpg")
+```
+
+
+Based on the figures above, we see OPFE can make the homogeneous field very heterogeneous and thus getting very different yield response functions for the next year. And we see the range of the yield on the y-axis are very different across years and with different years of ofpe running. 
+
++ One insights of this result is that people should not use the same trial design maps over years, which may make their field more and more heterogeneous, people need to care about trial designs year by year. 
++ Another one would be, we have pretty flat and almost homogeneous soil here in Illinois, but due to OFPE, it becomes more heterogeneous.
+
+There is literature supporting this finding: "Previous modeling work in Iowa has shown that the available soil water and N status at planting time largely affected predicted mean yields and the range of yield level probabilities" (Archontoulis et al., 2016).
+
+----
+
+# To see if the yield response change is weather independent.
+  + To use wet year and dry year as fake data to run simulations. We are expecting to see the wet years are having narrower range on y-axis. 
+
+## wet year, used 2010
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-04-08\ at\ 11.26.45 PM.png")
+```
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-04-05\ at\ 3.41.58 PM.png")
+```
+
+## Nortmal year, used 2019
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/0744993d-c0fa-437c-83ba-3f42576ed31f.jpg")
+```
+
+## Dry year, used 2017
+
+```{r, echo=FALSE, out.width = '80%'}
+knitr::include_graphics("/Users/qianqiandu/Desktop/Screenshot\ 2024-04-06\ at\ 9.31.15 PM.png")
+```
+
++ These results are the same as we expected. The effect of previous N application on yield response is weather dependent. Wet years, rain may wash away the soil N, the range of yield response is narrower; in dry years, N stay in the soil(crop didn't use much and rain didn't wash it away), which makes the yield response more different with different N applied in the previous year. 
+
+
+---
+
+# Discussions 
+
+
+----
+
+
+
+
+
+
+
+
