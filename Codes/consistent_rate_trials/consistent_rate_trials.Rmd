@@ -28,9 +28,9 @@ library(daymetr)
 ```{r}
 
 ### ============ set path to the file ============ ###
-extd.dir = "/Users/qianqiandu/Desktop/N_Residual_APSIM/Git_Controled/consistent_rate_trials"
+extd.dir = "/Users/qianqiandu/Desktop/N_Residual_APSIM/Codes/consistent_rate_trials"
 
-write_dir = "/Users/qianqiandu/Desktop/N_Residual_APSIM/Git_Controled/consistent_rate_trials"
+write_dir = "/Users/qianqiandu/Desktop/N_Residual_APSIM/Codes/consistent_rate_trials"
 
 
 ###========== Check parameters of the file =========###
@@ -52,7 +52,7 @@ inspect_apsimx("consisten_rate_trials-edited.apsimx", src.dir = extd.dir, node =
 
 edit_apsimx("consisten_rate_trials-edited.apsimx", src.dir = extd.dir,
               wrt.dir = write_dir, node = "Weather",
-              value = "lowa_CC.met", overwrite = TRUE)
+              value = "fake_weather_wet.met", overwrite = TRUE)
 
 inspect_apsimx("consisten_rate_trials-edited.apsimx", src.dir = extd.dir, node = "Weather")
 
@@ -119,6 +119,7 @@ read_csv <- read_csv(("/Users/qianqiandu/Desktop/Ames_2004_2004.csv"), skip = 6)
 
 ```
 
+```{r}
 #------- get weekly average precipitation and temperature data -------#
 weather_weekly <- read_csv %>% 
   group_by(year, week) %>% 
