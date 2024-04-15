@@ -23,7 +23,7 @@
         {
           "$type": "Models.Climate.Weather, Models",
           "ConstantsFile": null,
-          "FileName": "Iowa_CC.met",
+          "FileName": "fake_weather_dry.met",
           "ExcelWorkSheetName": "",
           "Name": "Weather",
           "ResourceName": null,
@@ -33,8 +33,8 @@
         },
         {
           "$type": "Models.Clock, Models",
-          "Start": "2000-01-01T00:00:00",
-          "End": "2006-01-01T00:00:00",
+          "Start": "2015-01-01T00:00:00",
+          "End": "2020-01-01T00:00:00",
           "Name": "Clock",
           "ResourceName": null,
           "Children": [],

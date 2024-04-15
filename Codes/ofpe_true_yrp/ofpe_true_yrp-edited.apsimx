@@ -34,7 +34,7 @@
         {
           "$type": "Models.Clock, Models",
           "Start": "01/01/2015",
-          "End": "12/31/2018",
+          "End": "12/31/2016",
           "Name": "Clock",
           "ResourceName": null,
           "Children": [],
@@ -753,8 +753,8 @@
                   "$type": "Models.Operation, Models",
                   "Enabled": true,
                   "Date": "2015-05-05",
-                  "Action": "[Fertiliser].Apply(Amount: 0, Type: Fertiliser.Types.UAN_N, Depth: 30)",
-                  "Line": "[Fertiliser].Apply(Amount: 0, Type: Fertiliser.Types.UAN_N, Depth: 30)"
+                  "Action": "[Fertiliser].Apply(Amount: 50, Type: Fertiliser.Types.UAN_N, Depth: 30)",
+                  "Line": "[Fertiliser].Apply(Amount: 50, Type: Fertiliser.Types.UAN_N, Depth: 30)"
                 },
                 {
                   "$type": "Models.Operation, Models",
@@ -809,8 +809,8 @@
                   "$type": "Models.Operation, Models",
                   "Enabled": true,
                   "Date": "2016-05-05",
-                  "Action": "[Fertiliser].Apply(Amount: 60, Type: Fertiliser.Types.UAN_N, Depth: 30)",
-                  "Line": "[Fertiliser].Apply(Amount: 60, Type: Fertiliser.Types.UAN_N, Depth: 30)"
+                  "Action": "[Fertiliser].Apply(Amount: 250, Type: Fertiliser.Types.UAN_N, Depth: 30)",
+                  "Line": "[Fertiliser].Apply(Amount: 250, Type: Fertiliser.Types.UAN_N, Depth: 30)"
                 },
                 {
                   "$type": "Models.Operation, Models",
@@ -865,8 +865,8 @@
                   "$type": "Models.Operation, Models",
                   "Enabled": true,
                   "Date": "2017-05-05",
-                  "Action": "[Fertiliser].Apply(Amount: 90, Type: Fertiliser.Types.UAN_N, Depth: 30)",
-                  "Line": "[Fertiliser].Apply(Amount: 90, Type: Fertiliser.Types.UAN_N, Depth: 30)"
+                  "Action": "[Fertiliser].Apply(Amount: 200, Type: Fertiliser.Types.UAN_N, Depth: 30)",
+                  "Line": "2017-05-05 [Fertiliser].Apply(Amount: 200, Type: Fertiliser.Types.UAN_N, Depth: 30)"
                 },
                 {
                   "$type": "Models.Operation, Models",
@@ -921,8 +921,8 @@
                   "$type": "Models.Operation, Models",
                   "Enabled": true,
                   "Date": "2018-05-05",
-                  "Action": "[Fertiliser].Apply(Amount: 0, Type: Fertiliser.Types.UAN_N, Depth: 30)",
-                  "Line": "[Fertiliser].Apply(Amount: 0, Type: Fertiliser.Types.UAN_N, Depth: 30)"
+                  "Action": "[Fertiliser].Apply(Amount: 100, Type: Fertiliser.Types.UAN_N, Depth: 30)",
+                  "Line": "2018-05-05 [Fertiliser].Apply(Amount: 100, Type: Fertiliser.Types.UAN_N, Depth: 30)"
                 },
                 {
                   "$type": "Models.Operation, Models",
