@@ -1,0 +1,81 @@
+---
+title: "economic_loss"
+author: "Qianqian Du"
+date: "2024-04-15"
+output: html_document
+---
+
+```{r}
+
+final_result_2016 <- final_result %>% 
+  data.table() %>% 
+  .[year == 2016, ] %>% 
+  .[, .(yield = max(CropYield), NO3, Date), by = c("plot_id", "applied_N")] %>% 
+  .[Date == '2016-05-04', ] %>% 
+  mutate(NO3_group = case_when(NO3 < 25 ~ "Low",
+                               NO3 >= 25 & NO3 < 30 ~ "Med", 
+                               NO3 >= 30 ~ "High"))
+
+ggplot(data = final_result_2016)+
+  geom_point(aes(x = applied_N, y = yield, group = plot_id))
+
+final_result_2016$plot_id %>% unique()
+
+
+ofpe_2016_20 <- ofpe_2016[1:20, ]
+
+ofpe_2016_20_analysis <- left_join(ofpe_2016_20, final_result)
+
+#--- set prices ---#
+corn_price <- 0.157 # $/kg, equivalent to 4 $/bu
+N_price <- 0.88 # $/kg, equivalent to 0.4 $/lb
+
+final_result_2016_eonr <- final_result_2016 %>% 
+  data.table() %>% 
+  .[, profit := (yield*corn_price)-(applied_N*N_price)] %>% 
+  group_by(plot_id) %>% 
+  filter(profit == max(profit))
+
+sum(final_result_2016_eonr$profit)
+
+
+
+# /*----------------------------------*/
+#' ## Economic optimization (for OFPE)
+# /*----------------------------------*/
+
+gam_res <- gam(
+  yield 
+  ~ s(applied_N),
+  data = ofpe_2016_20_analysis
+)
+
+
+eval_data <- expand_grid(
+  applied_N = seq(
+    0,
+    270), 
+    length = 100
+) %>% 
+data.table()
+
+
+yield_predction <- predict(gam_res, newdata = eval_data, se = TRUE) %>% 
+  as.data.frame()
+
+
+all_result <- cbind(eval_data, yield_predction) %>% 
+  data.table() %>% 
+  rename("yield" = ".") %>% 
+  mutate(profit = (yield*corn_price)-(applied_N*N_price))
+
+  
+all_result$yield <- as.numeric(all_result$yield)
+all_result$applied_N <- as.numeric(all_result$applied_N)
+
+ggplot(data = all_result)+
+  geom_point(x = applied_N, y = yield)
+
+
+
+```
