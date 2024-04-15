@@ -7,7 +7,7 @@ output: html_document
 
 + Objective:
 
-Run APSIM simulations through R, the trials follow OFPE setting- each plot/point recive randomly different amount of N nates in each year. Assuming homogeneous plots within fields.
+Run APSIM simulations through R, the trials follow OFPE setting- each plot/point randomly receive different amount of N rates in each year. Assuming homogeneous plots within fields.
 
 # uplode the packages
 ```{r, message=FALSE, warning=FALSE}
@@ -387,95 +387,6 @@ inspect_apsimx("ofpe_trials-edited.apsimx",
 
 
 
-##--------------- change the 8th year's fertilizer amount -------------##
-# new.date <- "2022-05-05"
-# new.action <- paste0("[Fertiliser].Apply(Amount: ",N[8],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
-# new_line <- paste0("2022-05-05 [Fertiliser].Apply(Amount: ",N[8],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
-# 
-# edit_apsimx("ofpe_trials-edited.apsimx",
-#             src.dir = write_dir,
-#             wrt.dir = write_dir,
-#             node = "Operations",
-#             parm = list(59, 'Date'),
-#             value = new.date,
-#             overwrite = TRUE)
-# 
-# 
-# edit_apsimx("ofpe_trials-edited.apsimx",
-#             src.dir = write_dir,
-#             wrt.dir = write_dir,
-#             node = "Operations",
-#             parm = list(59, 'Action'),
-#             value = new.action,
-#             overwrite = TRUE)
-# 
-# 
-# edit_apsimx("ofpe_trials-edited.apsimx",
-#             src.dir = write_dir,
-#             wrt.dir = write_dir,
-#             node = "Operations",
-#             parm = list(59, 'Line'),
-#             value = new.action,
-#             overwrite = TRUE)
-# 
-# inspect_apsimx("ofpe_trials-edited.apsimx",
-#                node = "Operations",
-#                parm = list(59, 'Date'))
-# 
-# inspect_apsimx("ofpe_trials-edited.apsimx",
-#                node = "Operations",
-#                parm = list(59, 'Action'))
-# 
-# inspect_apsimx("ofpe_trials-edited.apsimx",
-#                node = "Operations",
-#                parm = list(59, 'Line'))
-
-
-##--------------- change the 9th year's fertilizer amount -------------##
-# new.date <- "2023-05-05"
-# new.action <- paste0("[Fertiliser].Apply(Amount: ",N[9],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
-# new_line <- paste0("2023-05-05 [Fertiliser].Apply(Amount: ",N[9],", Type: Fertiliser.Types.UAN_N, Depth: 30)")
-# 
-# edit_apsimx("ofpe_trials-edited.apsimx",
-#             src.dir = write_dir,
-#             wrt.dir = write_dir,
-#             node = "Operations",
-#             parm = list(67, 'Date'),
-#             value = new.date,
-#             overwrite = TRUE)
-# 
-# 
-# edit_apsimx("ofpe_trials-edited.apsimx",
-#             src.dir = write_dir,
-#             wrt.dir = write_dir,
-#             node = "Operations",
-#             parm = list(67, 'Action'),
-#             value = new.action,
-#             overwrite = TRUE)
-# 
-# 
-# edit_apsimx("ofpe_trials-edited.apsimx",
-#             src.dir = write_dir,
-#             wrt.dir = write_dir,
-#             node = "Operations",
-#             parm = list(67, 'Line'),
-#             value = new.action,
-#             overwrite = TRUE)
-# 
-# inspect_apsimx("ofpe_trials-edited.apsimx",
-#                node = "Operations",
-#                parm = list(67, 'Date'))
-# 
-# inspect_apsimx("ofpe_trials-edited.apsimx",
-#                node = "Operations",
-#                parm = list(67, 'Action'))
-# 
-# inspect_apsimx("ofpe_trials-edited.apsimx",
-#                node = "Operations",
-#                parm = list(67, 'Line'))
-
-
-
 #######============== Run simulations =============#######
 simulation <- apsimx("ofpe_trials-edited.apsimx", src.dir = write_dir, value = "Report") %>% 
   data.table()
@@ -498,11 +409,48 @@ return(simulation_data)
 result_real_weather <- lapply(1:70, function(x) run_simpulation(x, N_rates)) %>% 
   rbindlist()
 
-saveRDS(result_real_weather, file = "ofpe_real_weather.rds")
+# saveRDS(result_real_weather, file = "ofpe_real_weather.rds")
 
 ```
 
 
+```{r}
+
+create_figure <- readRDS("/Users/qianqiandu/Desktop/N_Residual_APSIM/Codes/OFPE_trials/initial_N_result.rds") %>% 
+  data.table() %>% 
+  .[year == 2017, ] %>% 
+  .[, .(yield = max(CropYield)), by = c("year", "applied_N", "previous_N")] %>% 
+  mutate(plot_id = (row_number() - 1) %/% 10 + 1)
+
+
+# create a ofpe to generate a observed yield response 
+
+N_2017 <- data.frame(
+  applied_N = sample(N_rates$var_N, 10, replace = FALSE)
+  ) %>% 
+  mutate(plot_id = row_number())
+
+
+N_2017$applied_N <- as.numeric(N_2017$applied_N)
+create_figure$applied_N <- as.numeric(create_figure$applied_N)
+
+
+
+ofpe_2017_1 <- left_join(N_2017, create_figure, by = c("applied_N", "plot_id"))
+ofpe_2017_2 <- left_join(N_2017, create_figure, by = c("applied_N", "plot_id"))
+ofpe_2017_3 <- left_join(N_2017, create_figure, by = c("applied_N", "plot_id"))
+  
+
+ofpe_2017 <- rbind(ofpe_2017_1, ofpe_2017_2, ofpe_2017_3)
+
+ggplot()+
+  geom_point(aes(x = applied_N, y = yield, color = previous_N), data = create_figure)+
+  geom_line(aes(x = applied_N, y = yield, color = previous_N), data = create_figure)+
+  geom_point(aes(x = applied_N, y = yield), data = ofpe_2017)+
+  geom_smooth(aes(x = applied_N, y = yield), data = ofpe_2017, size = 1.5)+
+  theme_bw()
+
+```
 
 
 ```{r}
