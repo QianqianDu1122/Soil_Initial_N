@@ -29,9 +29,9 @@ library(lubridate)
 ```{r}
 
 ### ============ set path to the file ============ ###
-extd.dir = "/Users/qianqiandu/Desktop/N_Residual_APSIM/Git_Controled/true_yield_response"
+extd.dir = "/Users/qianqiandu/Desktop/N_Residual_APSIM/Codes/true_yield_response"
 
-write_dir = "/Users/qianqiandu/Desktop/N_Residual_APSIM/Git_Controled/true_yield_response"
+write_dir = "/Users/qianqiandu/Desktop/N_Residual_APSIM/Codes/true_yield_response"
 
 
 ###========== Check parameters of the file =========###
@@ -53,7 +53,7 @@ inspect_apsimx("true_yield_response-edited.apsimx", src.dir = extd.dir, node = "
 
 edit_apsimx("true_yield_response-edited.apsimx", src.dir = extd.dir,
               wrt.dir = write_dir, node = "Weather",
-              value = "fake_weather.met", overwrite = TRUE)
+              value = "fake_weather_dry.met", overwrite = TRUE)
 
 inspect_apsimx("true_yield_response-edited.apsimx", src.dir = extd.dir, node = "Weather")
 
@@ -560,10 +560,10 @@ for (i in 1:nrow(N_rates)) {
   
 new.date <- "2015-05-05"
 # new.action <- '[Fertiliser].Apply(Amount: 0, Type: Fertiliser.Types.UAN_N, Depth: 30)'
-new.action <- paste0("[Fertiliser].Apply(Amount: ",300,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+new.action <- paste0("[Fertiliser].Apply(Amount: ",250,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
 
 # new.line <- '2015-05-05 [Fertiliser].Apply(Amount: 0, Type: Fertiliser.Types.UAN_N, Depth: 30)'
-new_line <- paste0("2015-05-05 [Fertiliser].Apply(Amount: ",300,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+new_line <- paste0("2015-05-05 [Fertiliser].Apply(Amount: ",250,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
 
 
 edit_apsimx("true_yield_response-edited.apsimx",
@@ -607,8 +607,8 @@ inspect_apsimx("true_yield_response-edited.apsimx",
 
 ##--------------- change the 2nd year's fertilizer amount -------------##
 new.date <- "2016-05-05"
-new.action <- paste0("[Fertiliser].Apply(Amount: ",300,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
-new_line <- paste0("2016-05-05 [Fertiliser].Apply(Amount: ",300,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+new.action <- paste0("[Fertiliser].Apply(Amount: ",250,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
+new_line <- paste0("2016-05-05 [Fertiliser].Apply(Amount: ",250,", Type: Fertiliser.Types.UAN_N, Depth: 30)")
 
 edit_apsimx("true_yield_response-edited.apsimx",
             src.dir = write_dir,
@@ -709,7 +709,7 @@ simulation <- apsimx("true_yield_response-edited.apsimx", src.dir = write_dir, v
   .[, year := as.numeric(format(simulation$Date, "%Y"))] %>%
   .[, month := as.numeric(format(simulation$Date, "%m"))] %>% 
   .[, day := as.numeric(format(simulation$Date, "%d"))] %>% 
-  .[, previous_N := "300"] %>% 
+  .[, previous_N := "250"] %>% 
   .[, applied_N := sum(unique(AnnualNfertilizer)), by = year]
 
 
@@ -723,15 +723,17 @@ final_result$applied_N %>% unique()
 
 initial_N_result <- rbind(initial_N_result, final_result)
 
+
 initial_N_result$previous_N %>% unique()
 
-# saveRDS(initial_N_result, "/Users/qianqiandu/Desktop/N_Residual_APSIM/Git_Controled/OFPE_trials/initial_N_result.rds")
+# saveRDS(initial_N_result, "/Users/qianqiandu/Desktop/N_Residual_APSIM/Codes/OFPE_trials/initial_N_result_wet.rds")
 
 ```
 
 ```{r}
 
 initial_N_result_2017 <- initial_N_result %>% 
+  data.table() %>% 
   .[year == 2017, ] %>% 
   .[, .(yield = max(CropYield)), by = c("year", "previous_N", "applied_N")]
 
@@ -739,10 +741,10 @@ initial_N_result_2017 <- initial_N_result %>%
 ggplot()+
   geom_point(aes(x = applied_N, y = yield, color = factor(previous_N)), data = initial_N_result_2017)+
   geom_line(aes(x = applied_N, y = yield, color = factor(previous_N)), data = initial_N_result_2017)+
-  geom_point(aes(x = applied_N, y = yield), data = ofpe_2017)+
-  geom_line(aes(x = applied_N, y = yield), data = ofpe_2017)+
+  # geom_point(aes(x = applied_N, y = yield), data = ofpe_2017)+
+  # geom_line(aes(x = applied_N, y = yield), data = ofpe_2017)+
   theme_bw()+
-  ggtitle("colored are the true yield response, black is the opfe yield response")
+  ggtitle("colored are the true yield response")
 
 ```
 

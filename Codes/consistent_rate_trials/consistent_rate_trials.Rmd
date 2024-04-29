@@ -52,7 +52,7 @@ inspect_apsimx("consisten_rate_trials-edited.apsimx", src.dir = extd.dir, node =
 
 edit_apsimx("consisten_rate_trials-edited.apsimx", src.dir = extd.dir,
               wrt.dir = write_dir, node = "Weather",
-              value = "fake_weather_wet.met", overwrite = TRUE)
+              value = "fake_weather_dry.met", overwrite = TRUE)
 
 inspect_apsimx("consisten_rate_trials-edited.apsimx", src.dir = extd.dir, node = "Weather")
 
@@ -160,7 +160,7 @@ ggplot()+
 
 ```{r}
 simulation_result <- data.frame()
-simulation_real_weather <- data.frame()
+simulation_wet_weather <- data.frame()
 
 # length(N_rates[[1]])
 ```
@@ -173,9 +173,9 @@ simulation_real_weather <- data.frame()
 
 #### Editing just one operation, need to change all three ####
 
-for (i in 1:length(N_rates[[1]])) {
-
 N_rates <- list(seq(0, 270, by = 30))
+
+for (i in 1:length(N_rates[[1]])) {
 
 N = as.character(N_rates[[1]][i])
 
@@ -597,11 +597,14 @@ simulation <- apsimx("consisten_rate_trials-edited.apsimx", src.dir = write_dir,
 
 ###--- store the data ---###
 
-simulation_real_weather <- rbind(simulation_real_weather, simulation_data)
+simulation_wet_weather <- rbind(simulation_wet_weather, simulation_data)
 
 }
 
 # saveRDS(simulation_result, "/Users/qianqiandu/Desktop/N_Residual_APSIM/Git_Controled/consistent_rate_trials/same_weather_cons_N.rds")
+
+
+
 
 ```
 
@@ -611,16 +614,16 @@ simulation_real_weather <- rbind(simulation_real_weather, simulation_data)
 ##-------------------- plot yield ~ applied_N --------------------##
 
 ###------ Fake weather yield ------###
-yield <- simulation_result %>% 
+yield <- simulation_wet_weather %>% 
   data.table() %>% 
   .[, .(yield = max(CropYield)), by = c("year", "applied_N")]
 
 yield$applied_N <- as.numeric(yield$applied_N)
 
 
-fig_fake_weather <- ggplot(data = yield)+
-  geom_point(aes(x = applied_N, y = yield, color = as.factor(year)))+
-  geom_line(aes(x = applied_N, y = yield, color = as.factor(year)))+
+fig_fake_weather_wet <- ggplot(data = yield)+
+  geom_point(aes(x = applied_N, y = yield, color = as.factor(applied_N)))+
+  geom_line(aes(x = applied_N, y = yield, color = as.factor(applied_N)))+
   ggtitle("this used fake weather for consistent trials")
 
 
